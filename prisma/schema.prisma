@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  DOCTOR
+  RECEPTIONIST
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  password       String
+  role           UserRole  @default(RECEPTIONIST)
+  specialty      String?   // Para médicos
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  appointments   Appointment[] @relation("DoctorAppointments")
+  medicalRecords MedicalRecord[] @relation("DoctorRecords")
+}
+
+model Patient {
+  id             String    @id @default(cuid())
+  name           String
+  cpf            String    @unique
+  phone          String
+  email          String?
+  birthDate      DateTime?
+  gender         String?
+  address        String?
+  medicalHistory String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  appointments   Appointment[]
+  medicalRecords MedicalRecord[]
+  invoices       Invoice[]
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  date        DateTime
+  time        String
+  status      AppointmentStatus @default(SCHEDULED)
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  patient     Patient           @relation(fields: [patientId], references: [id])
+  patientId   String
+  doctor      User              @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  doctorId    String
+  medicalRecord MedicalRecord?
+}
+
+model MedicalRecord {
+  id          String    @id @default(cuid())
+  diagnosis   String
+  prescription String?
+  notes       String?
+  attachments String?   // URLs de anexos em JSON
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  patient     Patient   @relation(fields: [patientId], references: [id])
+  patientId   String
+  doctor      User      @relation("DoctorRecords", fields: [doctorId], references: [id])
+  doctorId    String
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  appointmentId String? @unique
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  amount      Float
+  description String
+  status      InvoiceStatus @default(PENDING)
+  dueDate     DateTime
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  patient     Patient       @relation(fields: [patientId], references: [id])
+  patientId   String
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  type        TransactionType
+  amount      Float
+  description String
+  category    String?
+  date        DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+
+  invoice     Invoice?        @relation(fields: [invoiceId], references: [id])
+  invoiceId   String?
+}
