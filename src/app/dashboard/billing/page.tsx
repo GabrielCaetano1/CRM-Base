@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, CreditCard, TrendingUp, TrendingDown, DollarSign } from "lucide-react"
+import { Plus, CreditCard, TrendingUp, DollarSign } from "lucide-react"
 
 interface Invoice {
   id: string
@@ -52,32 +52,40 @@ export default function BillingPage() {
   })
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    let cancelled = false
 
-  const fetchData = async () => {
-    try {
-      const [invoicesRes, transactionsRes, patientsRes] = await Promise.all([
-        fetch("/api/invoices"),
-        fetch("/api/transactions"),
-        fetch("/api/patients?limit=100"),
-      ])
+    async function load() {
+      try {
+        const [invoicesRes, transactionsRes, patientsRes] = await Promise.all([
+          fetch("/api/invoices"),
+          fetch("/api/transactions"),
+          fetch("/api/patients?limit=100"),
+        ])
 
-      const [invoicesData, transactionsData, patientsData] = await Promise.all([
-        invoicesRes.json(),
-        transactionsRes.json(),
-        patientsRes.json(),
-      ])
+        if (cancelled) return
 
-      setInvoices(invoicesData)
-      setTransactions(transactionsData)
-      setPatients(patientsData.patients)
-    } catch (error) {
-      console.error("Erro ao buscar dados financeiros:", error)
-    } finally {
-      setLoading(false)
+        const [invoicesData, transactionsData, patientsData] = await Promise.all([
+          invoicesRes.json(),
+          transactionsRes.json(),
+          patientsRes.json(),
+        ])
+
+        if (cancelled) return
+
+        setInvoices(invoicesData)
+        setTransactions(transactionsData)
+        setPatients(patientsData.patients)
+      } catch (err) {
+        console.error("Erro ao buscar dados financeiros:", err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
-  }
+
+    load()
+
+    return () => { cancelled = true }
+  }, [])
 
   const handleInvoiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -94,10 +102,10 @@ export default function BillingPage() {
       if (response.ok) {
         setShowInvoiceForm(false)
         setInvoiceFormData({ patientId: "", amount: "", description: "", dueDate: "" })
-        fetchData()
+        setLoading(true)
       }
-    } catch (error) {
-      console.error("Erro ao criar fatura:", error)
+    } catch (err) {
+      console.error("Erro ao criar fatura:", err)
     }
   }
 
@@ -116,10 +124,10 @@ export default function BillingPage() {
       if (response.ok) {
         setShowTransactionForm(false)
         setTransactionFormData({ type: "INCOME", amount: "", description: "", category: "" })
-        fetchData()
+        setLoading(true)
       }
-    } catch (error) {
-      console.error("Erro ao criar transação:", error)
+    } catch (err) {
+      console.error("Erro ao criar transacao:", err)
     }
   }
 
@@ -161,7 +169,7 @@ export default function BillingPage() {
         <div>
           <h1 className="text-2xl font-bold">Financeiro</h1>
           <p className="text-muted-foreground">
-            Controle de faturas e transações
+            Controle de faturas e transacoes
           </p>
         </div>
         <div className="flex gap-2">
@@ -171,7 +179,7 @@ export default function BillingPage() {
           </Button>
           <Button onClick={() => setShowTransactionForm(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Nova Transação
+            Nova Transacao
           </Button>
         </div>
       </div>
@@ -243,7 +251,7 @@ export default function BillingPage() {
                 required
               />
               <Input
-                placeholder="Descrição"
+                placeholder="Descricao"
                 value={invoiceFormData.description}
                 onChange={(e) => setInvoiceFormData({ ...invoiceFormData, description: e.target.value })}
                 required
@@ -269,7 +277,7 @@ export default function BillingPage() {
       {showTransactionForm && (
         <Card>
           <CardHeader>
-            <CardTitle>Nova Transação</CardTitle>
+            <CardTitle>Nova Transacao</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleTransactionSubmit} className="grid gap-4 md:grid-cols-2">
@@ -290,7 +298,7 @@ export default function BillingPage() {
                 required
               />
               <Input
-                placeholder="Descrição"
+                placeholder="Descricao"
                 value={transactionFormData.description}
                 onChange={(e) => setTransactionFormData({ ...transactionFormData, description: e.target.value })}
                 required
@@ -301,7 +309,7 @@ export default function BillingPage() {
                 onChange={(e) => setTransactionFormData({ ...transactionFormData, category: e.target.value })}
               />
               <div className="flex gap-2 md:col-span-2">
-                <Button type="submit">Registrar Transação</Button>
+                <Button type="submit">Registrar Transacao</Button>
                 <Button type="button" variant="outline" onClick={() => setShowTransactionForm(false)}>
                   Cancelar
                 </Button>
@@ -322,7 +330,7 @@ export default function BillingPage() {
           variant={activeTab === "transactions" ? "default" : "outline"}
           onClick={() => setActiveTab("transactions")}
         >
-          Transações
+          Transacoes
         </Button>
       </div>
 
@@ -368,11 +376,11 @@ export default function BillingPage() {
         <div className="grid gap-4">
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">
-              Carregando transações...
+              Carregando transacoes...
             </div>
           ) : transactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              Nenhuma transação encontrada
+              Nenhuma transacao encontrada
             </div>
           ) : (
             transactions.map((transaction) => (

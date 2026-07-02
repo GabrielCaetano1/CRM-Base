@@ -1,138 +1,145 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Calendar, Clock, User, CheckCircle, XCircle, AlertCircle } from "lucide-react"
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Plus,
+  Calendar,
+  Clock,
+  User,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+} from "lucide-react";
 
 interface Appointment {
-  id: string
-  date: string
-  time: string
-  status: string
-  notes: string | null
-  patient: { name: string; phone: string }
-  doctor: { name: string; specialty: string | null }
+  id: string;
+  date: string;
+  time: string;
+  status: string;
+  notes: string | null;
+  patient: { name: string; phone: string };
+  doctor: { name: string; specialty: string | null };
 }
 
 interface Patient {
-  id: string
-  name: string
+  id: string;
+  name: string;
 }
 
 interface Doctor {
-  id: string
-  name: string
+  id: string;
+  name: string;
 }
 
 export default function AppointmentsPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [patients, setPatients] = useState<Patient[]>([])
-  const [doctors, setDoctors] = useState<Doctor[]>([])
-  const [loading, setLoading] = useState(true)
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  )
-  const [showForm, setShowForm] = useState(false)
+    new Date().toISOString().split("T")[0],
+  );
+  const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     patientId: "",
     doctorId: "",
     date: new Date().toISOString().split("T")[0],
     time: "",
     notes: "",
-  })
+  });
 
   useEffect(() => {
-    fetchAppointments()
-    fetchPatients()
-    fetchDoctors()
-  }, [selectedDate])
+    let cancelled = false;
 
-  const fetchAppointments = async () => {
-    try {
-      const response = await fetch(`/api/appointments?date=${selectedDate}`)
-      const data = await response.json()
-      setAppointments(data)
-    } catch (error) {
-      console.error("Erro ao buscar agendamentos:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    async function load() {
+      try {
+        const [aptRes, patRes, docRes] = await Promise.all([
+          fetch(`/api/appointments?date=${selectedDate}`),
+          fetch("/api/patients?limit=100"),
+          fetch("/api/auth/register"),
+        ]);
 
-  const fetchPatients = async () => {
-    try {
-      const response = await fetch("/api/patients?limit=100")
-      const data = await response.json()
-      setPatients(data.patients)
-    } catch (error) {
-      console.error("Erro ao buscar pacientes:", error)
-    }
-  }
+        if (cancelled) return;
 
-  const fetchDoctors = async () => {
-    try {
-      const response = await fetch("/api/auth/register")
-      const data = await response.json()
-      setDoctors(data.filter((u: Doctor & { role?: string }) => u.role === "DOCTOR"))
-    } catch (error) {
-      console.error("Erro ao buscar médicos:", error)
+        const [aptData, patData, docData] = await Promise.all([
+          aptRes.json(),
+          patRes.json(),
+          docRes.json(),
+        ]);
+
+        if (cancelled) return;
+
+        setAppointments(aptData);
+        setPatients(patData.patients);
+        setDoctors(docData.filter((u: Doctor & { role?: string }) => u.role === "DOCTOR"));
+      } catch (err) {
+        console.error("Erro ao carregar dados:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-  }
+
+    load();
+
+    return () => { cancelled = true; };
+  }, [selectedDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     try {
       const response = await fetch("/api/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
-      })
+      });
 
       if (response.ok) {
-        setShowForm(false)
+        setShowForm(false);
         setFormData({
           patientId: "",
           doctorId: "",
           date: new Date().toISOString().split("T")[0],
           time: "",
           notes: "",
-        })
-        fetchAppointments()
+        });
+        setLoading(true);
+        setSelectedDate((d) => d);
       }
-    } catch (error) {
-      console.error("Erro ao criar agendamento:", error)
+    } catch (err) {
+      console.error("Erro ao criar agendamento:", err);
     }
-  }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "CONFIRMED":
-        return <CheckCircle className="h-4 w-4 text-green-600" />
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
       case "CANCELLED":
-        return <XCircle className="h-4 w-4 text-red-600" />
+        return <XCircle className="h-4 w-4 text-red-600" />;
       case "COMPLETED":
-        return <CheckCircle className="h-4 w-4 text-blue-600" />
+        return <CheckCircle className="h-4 w-4 text-blue-600" />;
       default:
-        return <AlertCircle className="h-4 w-4 text-yellow-600" />
+        return <AlertCircle className="h-4 w-4 text-yellow-600" />;
     }
-  }
+  };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "SCHEDULED":
-        return "Agendado"
+        return "Agendado";
       case "CONFIRMED":
-        return "Confirmado"
+        return "Confirmado";
       case "CANCELLED":
-        return "Cancelado"
+        return "Cancelado";
       case "COMPLETED":
-        return "Concluído"
+        return "Concluido";
       default:
-        return status
+        return status;
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -168,7 +175,9 @@ export default function AppointmentsPage() {
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={formData.patientId}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, patientId: e.target.value })
+                }
                 required
               >
                 <option value="">Selecione o paciente</option>
@@ -181,10 +190,12 @@ export default function AppointmentsPage() {
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={formData.doctorId}
-                onChange={(e) => setFormData({ ...formData, doctorId: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, doctorId: e.target.value })
+                }
                 required
               >
-                <option value="">Selecione o médico</option>
+                <option value="">Selecione o medico</option>
                 {doctors.map((doctor) => (
                   <option key={doctor.id} value={doctor.id}>
                     {doctor.name}
@@ -194,24 +205,34 @@ export default function AppointmentsPage() {
               <Input
                 type="date"
                 value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, date: e.target.value })
+                }
                 required
               />
               <Input
                 type="time"
                 value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, time: e.target.value })
+                }
                 required
               />
               <textarea
-                placeholder="Observações"
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-2"
+                placeholder="Observacoes"
+                className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-2"
                 value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, notes: e.target.value })
+                }
               />
               <div className="flex gap-2 md:col-span-2">
                 <Button type="submit">Agendar</Button>
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowForm(false)}
+                >
                   Cancelar
                 </Button>
               </div>
@@ -237,7 +258,9 @@ export default function AppointmentsPage() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       {getStatusIcon(appointment.status)}
-                      <h3 className="font-medium">{appointment.patient.name}</h3>
+                      <h3 className="font-medium">
+                        {appointment.patient.name}
+                      </h3>
                       <span className="text-sm text-muted-foreground">
                         ({getStatusLabel(appointment.status)})
                       </span>
@@ -277,5 +300,5 @@ export default function AppointmentsPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
